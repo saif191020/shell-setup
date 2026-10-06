@@ -1,8 +1,0 @@
-# Per-machine shell overrides. install.sh copies this to
-# ~/.config/shell-setup/local.bash if it does not exist. Not tracked in git.
-#
-# Example: pull in a shared aliases file that only exists on some hosts.
-# [ -f ~/sync_folder/.my_aliases ] && . ~/sync_folder/.my_aliases
-#
-# Example: machine-specific alias.
-# alias deploy='./scripts/deploy.sh'

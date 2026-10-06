@@ -1,12 +1,12 @@
 #!/bin/sh
-# shell-setup installer. Idempotent: run it as often as you like.
+# shell-setup installer: installs the tools the aliases need and sources
+# aliases.sh from ~/.bashrc. Idempotent: run it as often as you like.
 #
-#   curl -fsSL https://raw.githubusercontent.com/<you>/shell-setup/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/saif191020/shell-setup/main/install.sh | sh
 #   sh install.sh [--dry-run] [--no-packages] [--no-binaries] [--uninstall]
 #
 # Environment:
-#   SHELL_SETUP_REPO  git URL to clone when run via a pipe (required then,
-#                     unless the default below has been edited)
+#   SHELL_SETUP_REPO  git URL to clone when run via a pipe
 #   SHELL_SETUP_DIR   where the clone lives (default ~/.local/share/shell-setup)
 #   SHELL_SETUP_REF   branch/tag to track (default main)
 
@@ -15,7 +15,6 @@ set -eu
 REPO_URL="${SHELL_SETUP_REPO:-https://github.com/saif191020/shell-setup.git}"
 INSTALL_DIR="${SHELL_SETUP_DIR:-$HOME/.local/share/shell-setup}"
 REF="${SHELL_SETUP_REF:-main}"
-CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell-setup"
 BASHRC="$HOME/.bashrc"
 MARK_BEGIN='# >>> shell-setup >>>'
 MARK_END='# <<< shell-setup <<<'
@@ -30,7 +29,7 @@ for arg in "$@"; do
         --no-packages) DO_PACKAGES=0 ;;
         --no-binaries) DO_BINARIES=0 ;;
         --uninstall) UNINSTALL=1 ;;
-        -h|--help) sed -n '2,13p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,11p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -56,54 +55,33 @@ if have apt-get; then PM=apt
 elif have dnf; then PM=dnf
 elif have pacman; then PM=pacman
 elif have apk; then PM=apk
-elif have brew; then PM=brew
 fi
 
 pm_install() {
-    # $1 = package name. Returns non-zero if it could not be installed.
     case "$PM" in
         apt)    run $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$1" ;;
         dnf)    run $SUDO dnf install -y "$1" ;;
         pacman) run $SUDO pacman -S --needed --noconfirm "$1" ;;
         apk)    run $SUDO apk add "$1" ;;
-        brew)   run brew install "$1" ;;
         *)      return 1 ;;
     esac
 }
 
 pm_has_package() {
-    # Is this package available in the configured repos?
     case "$PM" in
         apt)    apt-cache show "$1" >/dev/null 2>&1 ;;
         dnf)    dnf info "$1" >/dev/null 2>&1 ;;
         pacman) pacman -Si "$1" >/dev/null 2>&1 ;;
         apk)    apk search -e "$1" 2>/dev/null | grep -q . ;;
-        brew)   brew info "$1" >/dev/null 2>&1 ;;
         *)      return 1 ;;
-    esac
-}
-
-# tool -> package name for this package manager
-pkg_for() {
-    case "$1:$PM" in
-        fd:apt|fd:dnf) echo fd-find ;;
-        fd:*)          echo fd ;;
-        rg:*)          echo ripgrep ;;
-        bash-completion:brew) echo bash-completion@2 ;;
-        *)             echo "$1" ;;
     esac
 }
 
 tool_present() {
     case "$1" in
-        bat)  have bat || have batcat ;;
-        fd)   have fd || have fdfind ;;
-        eza)  have eza || have exa ;;
-        bash-completion)
-            [ -r /usr/share/bash-completion/bash_completion ] || [ -r /etc/bash_completion ] \
-                || [ -r /opt/homebrew/etc/profile.d/bash_completion.sh ] \
-                || [ -r /usr/local/etc/profile.d/bash_completion.sh ] ;;
-        *)    have "$1" ;;
+        bat) have bat || have batcat ;;
+        eza) have eza || have exa ;;
+        *)   have "$1" ;;
     esac
 }
 
@@ -116,7 +94,7 @@ if [ -f "$0" ]; then
     script_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || script_dir=
 fi
 
-if [ -z "$script_dir" ] || [ ! -f "$script_dir/shell/init.bash" ]; then
+if [ -z "$script_dir" ] || [ ! -f "$script_dir/aliases.sh" ]; then
     if ! have git; then
         [ "$UNINSTALL" -eq 1 ] && die "git is required to bootstrap"
         say "git is needed to fetch the repo"
@@ -140,9 +118,6 @@ fi
 
 ROOT="$script_dir"
 
-# ---------------------------------------------------------------------------
-# ~/.bashrc managed block
-# ---------------------------------------------------------------------------
 strip_block() {
     # Print $1 with any existing managed block removed.
     awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
@@ -156,6 +131,16 @@ trim_blank() {
     awk 'NF {for (i=0;i<n;i++) print ""; n=0; print; next} {n++}'
 }
 
+# Older versions of this repo added a git include; remove it if present.
+remove_legacy_git_include() {
+    have git || return 0
+    git config --global --get-all include.path 2>/dev/null | grep -q 'shell-setup/config/gitconfig$' || return 0
+    run git config --global --unset-all include.path 'shell-setup/config/gitconfig$' || true
+    if [ "$DRY" -eq 0 ] && ! git config --global --get-regexp '^include\.' >/dev/null 2>&1; then
+        git config --global --remove-section include 2>/dev/null || true
+    fi
+}
+
 if [ "$UNINSTALL" -eq 1 ]; then
     say "Removing managed block from $BASHRC"
     if [ -f "$BASHRC" ] && grep -qF "$MARK_BEGIN" "$BASHRC"; then
@@ -164,24 +149,22 @@ if [ "$UNINSTALL" -eq 1 ]; then
             tmp=$(mktemp); strip_block "$BASHRC" | trim_blank > "$tmp"; cat "$tmp" > "$BASHRC"; rm -f "$tmp"
         fi
     fi
-    if git config --global --get-all include.path 2>/dev/null | grep -qxF "$ROOT/config/gitconfig"; then
-        run git config --global --unset include.path "^$ROOT/config/gitconfig\$" || true
-    fi
-    say "Done. Left in place: $ROOT, $CONF_DIR (your env/local files), installed packages."
+    remove_legacy_git_include
+    say "Done. Left in place: $ROOT and installed packages."
     exit 0
 fi
 
 # ---------------------------------------------------------------------------
-# 1. Packages
+# 1. Packages the aliases use
 # ---------------------------------------------------------------------------
 if [ "$DO_PACKAGES" -eq 1 ]; then
     if [ -z "$PM" ]; then
         warn "no supported package manager found; skipping package install"
-    elif [ -z "$SUDO" ] && [ "$(id -u)" -ne 0 ] && [ "$PM" != brew ]; then
+    elif [ -z "$SUDO" ] && [ "$(id -u)" -ne 0 ]; then
         warn "need root: no sudo, or sudo has no terminal for a password. Re-run in a terminal to install packages"
     else
         missing=
-        for t in git curl fzf bat eza xclip rg fd bash-completion; do
+        for t in curl bat eza xclip; do
             tool_present "$t" || missing="$missing $t"
         done
         if [ -z "$missing" ]; then
@@ -189,8 +172,7 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
         else
             say "Installing:$missing  (via $PM)"
             [ "$PM" = apt ] && { run $SUDO apt-get update -qq || warn "apt-get update failed"; }
-            for t in $missing; do
-                pkg=$(pkg_for "$t")
+            for pkg in $missing; do
                 if [ "$DRY" -eq 0 ] && ! pm_has_package "$pkg"; then
                     warn "$pkg is not available from $PM repos; skipping"
                     continue
@@ -203,20 +185,8 @@ else
     say "Skipping packages (--no-packages)"
 fi
 
-# ---------------------------------------------------------------------------
-# 2. ~/.local/bin shims + eza fallback
-# ---------------------------------------------------------------------------
-run mkdir -p "$HOME/.local/bin"
-# Debian renames these; give them their upstream names.
-if ! have bat && have batcat && [ ! -e "$HOME/.local/bin/bat" ]; then
-    run ln -s "$(command -v batcat)" "$HOME/.local/bin/bat"
-fi
-if ! have fd && have fdfind && [ ! -e "$HOME/.local/bin/fd" ]; then
-    run ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
-fi
-
 # eza isn't in every distro's repos (e.g. Debian 12). Fall back to the upstream
-# release tarball, installed to ~/.local/bin.
+# release binary in ~/.local/bin, unless exa is already there.
 if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/bin/eza" ] && have curl; then
     case "$(uname -m)" in
         x86_64|amd64)  eza_arch=x86_64 ;;
@@ -229,6 +199,7 @@ if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/
         if [ "$DRY" -eq 1 ]; then
             echo "   [dry-run] curl -fsSL $url | tar xz -C ~/.local/bin"
         else
+            mkdir -p "$HOME/.local/bin"
             tmp=$(mktemp -d)
             if curl -fsSL "$url" | tar xz -C "$tmp" && [ -f "$tmp/eza" ]; then
                 install -m 0755 "$tmp/eza" "$HOME/.local/bin/eza"
@@ -241,12 +212,12 @@ if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/
 fi
 
 # ---------------------------------------------------------------------------
-# 3. ~/.bashrc managed block
+# 2. ~/.bashrc managed block
 # ---------------------------------------------------------------------------
 say "Wiring $BASHRC"
 block="$MARK_BEGIN
 # Managed by shell-setup. Edit via the repo, not here.
-[ -f \"$ROOT/shell/init.bash\" ] && . \"$ROOT/shell/init.bash\"
+[ -f \"$ROOT/aliases.sh\" ] && . \"$ROOT/aliases.sh\"
 $MARK_END"
 
 if [ "$DRY" -eq 1 ]; then
@@ -258,35 +229,11 @@ else
         say "Backed up original to $BASHRC.pre-shell-setup"
     fi
     tmp=$(mktemp)
-    strip_block "$BASHRC" > "$tmp"
-    trim_blank < "$tmp" > "$tmp.2"
-    { cat "$tmp.2"; [ -s "$tmp.2" ] && echo; echo "$block"; } > "$BASHRC"
-    rm -f "$tmp" "$tmp.2"
+    strip_block "$BASHRC" | trim_blank > "$tmp"
+    { cat "$tmp"; [ -s "$tmp" ] && echo; echo "$block"; } > "$BASHRC"
+    rm -f "$tmp"
 fi
 
-# ---------------------------------------------------------------------------
-# 4. Private config (dotenv + local overrides)
-# ---------------------------------------------------------------------------
-say "Private config in $CONF_DIR"
-run mkdir -p "$CONF_DIR"
-if [ ! -f "$CONF_DIR/env" ]; then
-    run cp "$ROOT/config/env.example" "$CONF_DIR/env"
-    run chmod 600 "$CONF_DIR/env"
-fi
-if [ ! -f "$CONF_DIR/local.bash" ]; then
-    run cp "$ROOT/config/local.bash.example" "$CONF_DIR/local.bash"
-fi
-
-# ---------------------------------------------------------------------------
-# 5. Git defaults (identity-free), via include.path
-# ---------------------------------------------------------------------------
-if have git; then
-    if git config --global --get-all include.path 2>/dev/null | grep -qxF "$ROOT/config/gitconfig"; then
-        say "Git defaults already included"
-    else
-        say "Including git defaults"
-        run git config --global --add include.path "$ROOT/config/gitconfig"
-    fi
-fi
+remove_legacy_git_include
 
 say "Done. Open a new shell, or run:  exec bash"
