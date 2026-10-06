@@ -34,6 +34,11 @@ export FZF_CTRL_T_OPTS="--preview '$_file_preview' --preview-window=right:55%:wr
 export FZF_ALT_C_OPTS="--preview '$_tree {} | head -100' --preview-window=right:50%"
 export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window=down:3:wrap --bind='ctrl-y:execute-silent(echo -n {2..} | xclip -selection clipboard 2>/dev/null)+abort' --header='Ctrl-Y copies'"
 
+# Plain <Tab> opens fzf for cd/ls/vim/ssh/kill/... (a unique match completes
+# instantly). Set FZF_COMPLETION_TRIGGER='**' in your env file to go back to `**<Tab>`.
+: "${FZF_COMPLETION_TRIGGER=}"
+export FZF_COMPLETION_TRIGGER
+
 # --- shell integration -----------------------------------------------------
 # fzf >= 0.48 can print its own integration; older distro packages ship files.
 if fzf --bash >/dev/null 2>&1; then
@@ -42,6 +47,7 @@ else
     for _f in \
         /usr/share/doc/fzf/examples/key-bindings.bash \
         /usr/share/doc/fzf/examples/completion.bash \
+        /usr/share/bash-completion/completions/fzf \
         /usr/share/fzf/key-bindings.bash \
         /usr/share/fzf/completion.bash \
         /opt/homebrew/opt/fzf/shell/key-bindings.bash \
@@ -54,8 +60,7 @@ else
     unset _f
 fi
 
-# Fuzzy-complete from the shell with `**<TAB>`: vim **<TAB>, cd **<TAB>, kill <TAB>,
-# ssh **<TAB>, export **<TAB>. Use fd for the listings if we have it.
+# Fuzzy completion for cd, vim, kill, ssh, export, ... Use fd for the listings if we have it.
 if [ -n "$_fd" ]; then
     _fzf_compgen_path() { "$_fd" --hidden --follow --exclude .git . "$1"; }
     _fzf_compgen_dir()  { "$_fd" --type d --hidden --follow --exclude .git . "$1"; }
