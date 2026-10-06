@@ -48,7 +48,7 @@ run() {
 # sudo is usable if it needs no password or we have a terminal to prompt on.
 SUDO=
 if [ "$(id -u)" -ne 0 ] && have sudo; then
-    if sudo -n true 2>/dev/null || { : </dev/tty; } 2>/dev/null; then SUDO=sudo; fi
+    if sudo -n true 2>/dev/null || ( : </dev/tty ) 2>/dev/null; then SUDO=sudo; fi
 fi
 
 PM=
