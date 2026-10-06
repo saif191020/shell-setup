@@ -34,11 +34,6 @@ export FZF_CTRL_T_OPTS="--preview '$_file_preview' --preview-window=right:55%:wr
 export FZF_ALT_C_OPTS="--preview '$_tree {} | head -100' --preview-window=right:50%"
 export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window=down:3:wrap --bind='ctrl-y:execute-silent(echo -n {2..} | xclip -selection clipboard 2>/dev/null)+abort' --header='Ctrl-Y copies'"
 
-# Plain <Tab> opens fzf for cd/ls/vim/ssh/kill/... (a unique match completes
-# instantly). Set FZF_COMPLETION_TRIGGER='**' in your env file to go back to `**<Tab>`.
-: "${FZF_COMPLETION_TRIGGER=}"
-export FZF_COMPLETION_TRIGGER
-
 # --- shell integration -----------------------------------------------------
 # fzf >= 0.48 can print its own integration; older distro packages ship files.
 if fzf --bash >/dev/null 2>&1; then
@@ -60,20 +55,11 @@ else
     unset _f
 fi
 
-# Fuzzy completion for cd, vim, kill, ssh, export, ... With plain <Tab> the
-# listings show only the current level (depth 1, no symlink following) so
-# `cd /<Tab>` can't crawl a whole filesystem. Override with FZF_COMPLETION_MAX_DEPTH.
-if [ -z "$FZF_COMPLETION_TRIGGER" ]; then
-    _fzf_depth="${FZF_COMPLETION_MAX_DEPTH:-1}"
-else
-    _fzf_depth=
-fi
+# `**<Tab>` fuzzy completion (vim **<Tab>, cd **<Tab>, ssh **<Tab>, kill <Tab>).
+# Use fd for the listings if we have it (fast, skips .git, doesn't follow symlinks).
 if [ -n "$_fd" ]; then
-    _fzf_compgen_path() { "$_fd" --hidden --exclude .git ${_fzf_depth:+--max-depth "$_fzf_depth"} . "$1"; }
-    _fzf_compgen_dir()  { "$_fd" --type d --hidden --exclude .git ${_fzf_depth:+--max-depth "$_fzf_depth"} . "$1"; }
-else
-    _fzf_compgen_path() { find "$1" ${_fzf_depth:+-maxdepth "$_fzf_depth"} -mindepth 1 -not -path '*/.git/*' 2>/dev/null; }
-    _fzf_compgen_dir()  { find "$1" ${_fzf_depth:+-maxdepth "$_fzf_depth"} -mindepth 1 -type d -not -path '*/.git/*' 2>/dev/null; }
+    _fzf_compgen_path() { "$_fd" --hidden --exclude .git . "$1"; }
+    _fzf_compgen_dir()  { "$_fd" --type d --hidden --exclude .git . "$1"; }
 fi
 
 # --- pickers ---------------------------------------------------------------
