@@ -36,7 +36,8 @@ when not root) and adds one block to `~/.bashrc`. Your original `.bashrc` is sav
 | Key / command | Does |
 |---|---|
 | `Ctrl-R` / `Ctrl-T` / `Alt-C` | fuzzy history / files / cd |
-| `**<Tab>` | fuzzy path completion (`vim **<Tab>`) |
+| `<Tab>` | completion in fzf, current level only (one match completes straight away) |
+| `**<Tab>` | recursive fuzzy path search (`vim **<Tab>`) |
 | `z foo`, `zi` | jump to a frequent directory, or pick one with fzf |
 | `fe`, `fcd`, `frg`, `fkill`, `fssh`, `fman` | fuzzy open file, cd, grep, kill, ssh, man |
 | `fbr`, `fgl`, `fgs` | fuzzy git branch, log, stage |
@@ -53,3 +54,5 @@ Kept outside the repo in `~/.config/shell-setup/`:
 
 - `env`: dotenv file (`KEY=value`), exported into every interactive shell. Put secrets here.
 - `local.bash`: your per-machine aliases and functions, loaded last.
+
+Put `SHELL_SETUP_FZF_TAB=0` in `env` to keep plain bash Tab completion instead of fzf.

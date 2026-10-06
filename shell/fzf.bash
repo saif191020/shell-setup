@@ -62,6 +62,21 @@ if [ -n "$_fd" ]; then
     _fzf_compgen_dir()  { "$_fd" --type d --hidden --exclude .git . "$1"; }
 fi
 
+# --- fzf on <Tab> (bash version of zsh's fzf-tab) ------------------------
+# Tab runs normal completion; one match completes inline, several open fzf
+# with just those matches (current level only). `**<Tab>` still searches
+# recursively. Vendored from lincheney/fzf-tab-completion (see vendor/).
+# Set SHELL_SETUP_FZF_TAB=0 in your env file to keep plain bash Tab.
+export FZF_COMPLETION_OPTS="--preview '$SHELL_SETUP_ROOT/bin/fzf-preview {}' --preview-window=right:50%"
+if [ "${SHELL_SETUP_FZF_TAB:-1}" != 0 ] && [ "${BASH_VERSINFO[0]}" -ge 4 ] \
+    && [ -r "$SHELL_SETUP_ROOT/vendor/fzf-tab-completion/fzf-bash-completion.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SHELL_SETUP_ROOT/vendor/fzf-tab-completion/fzf-bash-completion.sh"
+    # Re-print the prompt's last line instead of a "Loading matches" message.
+    _fzf_bash_completion_loading_msg() { echo "${PS1@P}${READLINE_LINE}" | tail -n1; }
+    bind -x '"\t": fzf_bash_completion'
+fi
+
 # --- pickers ---------------------------------------------------------------
 
 # fe [query]: pick file(s) and open them in $EDITOR
