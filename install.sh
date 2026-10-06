@@ -217,7 +217,7 @@ fi
 
 # eza isn't in every distro's repos (e.g. Debian 12). Fall back to the upstream
 # release tarball, installed to ~/.local/bin.
-if [ "$DO_BINARIES" -eq 1 ] && ! have eza && [ ! -x "$HOME/.local/bin/eza" ] && have curl; then
+if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/bin/eza" ] && have curl; then
     case "$(uname -m)" in
         x86_64|amd64)  eza_arch=x86_64 ;;
         aarch64|arm64) eza_arch=aarch64 ;;
