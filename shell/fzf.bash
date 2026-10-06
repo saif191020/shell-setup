@@ -60,10 +60,20 @@ else
     unset _f
 fi
 
-# Fuzzy completion for cd, vim, kill, ssh, export, ... Use fd for the listings if we have it.
+# Fuzzy completion for cd, vim, kill, ssh, export, ... With plain <Tab> the
+# listings are kept shallow (default depth 3, no symlink following) so
+# `cd /<Tab>` can't crawl a whole filesystem. Override with FZF_COMPLETION_MAX_DEPTH.
+if [ -z "$FZF_COMPLETION_TRIGGER" ]; then
+    _fzf_depth="${FZF_COMPLETION_MAX_DEPTH:-3}"
+else
+    _fzf_depth=
+fi
 if [ -n "$_fd" ]; then
-    _fzf_compgen_path() { "$_fd" --hidden --follow --exclude .git . "$1"; }
-    _fzf_compgen_dir()  { "$_fd" --type d --hidden --follow --exclude .git . "$1"; }
+    _fzf_compgen_path() { "$_fd" --hidden --exclude .git ${_fzf_depth:+--max-depth "$_fzf_depth"} . "$1"; }
+    _fzf_compgen_dir()  { "$_fd" --type d --hidden --exclude .git ${_fzf_depth:+--max-depth "$_fzf_depth"} . "$1"; }
+else
+    _fzf_compgen_path() { find "$1" ${_fzf_depth:+-maxdepth "$_fzf_depth"} -mindepth 1 -not -path '*/.git/*' 2>/dev/null; }
+    _fzf_compgen_dir()  { find "$1" ${_fzf_depth:+-maxdepth "$_fzf_depth"} -mindepth 1 -type d -not -path '*/.git/*' 2>/dev/null; }
 fi
 
 # --- pickers ---------------------------------------------------------------
