@@ -3,7 +3,7 @@
 # aliases.sh from ~/.bashrc. Idempotent: run it as often as you like.
 #
 #   curl -fsSL https://raw.githubusercontent.com/saif191020/shell-setup/main/install.sh | sh
-#   sh install.sh [--dry-run] [--no-packages] [--no-binaries] [--uninstall]
+#   sh install.sh [--dry-run] [--no-packages] [--no-binaries] [--no-fzf] [--uninstall]
 #
 # Environment:
 #   SHELL_SETUP_REPO  git URL to clone when run via a pipe
@@ -22,12 +22,14 @@ MARK_END='# <<< shell-setup <<<'
 DRY=0
 DO_PACKAGES=1
 DO_BINARIES=1
+DO_FZF=1
 UNINSTALL=0
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY=1 ;;
         --no-packages) DO_PACKAGES=0 ;;
         --no-binaries) DO_BINARIES=0 ;;
+        --no-fzf) DO_FZF=0 ;;
         --uninstall) UNINSTALL=1 ;;
         -h|--help) sed -n '2,11p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -150,7 +152,8 @@ if [ "$UNINSTALL" -eq 1 ]; then
         fi
     fi
     remove_legacy_git_include
-    say "Done. Left in place: $ROOT and installed packages."
+    say "Done. Left in place: $ROOT, ~/.fzf and installed packages."
+    [ -d "$HOME/.fzf" ] && say "To remove fzf too:  rm -rf ~/.fzf ~/.fzf.bash ~/.fzf.zsh"
     exit 0
 fi
 
@@ -212,12 +215,41 @@ if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/
 fi
 
 # ---------------------------------------------------------------------------
-# 2. ~/.bashrc managed block
+# 2. fzf from upstream git (distro packages are often old). All install
+#    questions are answered by flags and stdin is /dev/null, so it never prompts.
+#    --no-update-rc: our ~/.bashrc block sources ~/.fzf.bash instead.
+# ---------------------------------------------------------------------------
+FZF_DIR="$HOME/.fzf"
+if [ "$DO_FZF" -eq 0 ]; then
+    say "Skipping fzf (--no-fzf)"
+elif ! have git; then
+    warn "git not found; skipping fzf"
+elif [ -e "$FZF_DIR" ] && [ ! -d "$FZF_DIR/.git" ]; then
+    warn "$FZF_DIR exists but is not a git clone; leaving it alone"
+else
+    if [ -d "$FZF_DIR/.git" ]; then
+        say "Updating $FZF_DIR"
+        run git -C "$FZF_DIR" pull --quiet --ff-only || warn "could not update $FZF_DIR; using it as-is"
+    else
+        say "Cloning fzf into $FZF_DIR"
+        run git clone --quiet --depth 1 https://github.com/junegunn/fzf.git "$FZF_DIR"
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "   [dry-run] $FZF_DIR/install --key-bindings --completion --no-update-rc --no-zsh --no-fish </dev/null"
+    else
+        "$FZF_DIR/install" --key-bindings --completion --no-update-rc --no-zsh --no-fish </dev/null \
+            || warn "fzf install failed"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 3. ~/.bashrc managed block
 # ---------------------------------------------------------------------------
 say "Wiring $BASHRC"
 block="$MARK_BEGIN
 # Managed by shell-setup. Edit via the repo, not here.
 [ -f \"$ROOT/aliases.sh\" ] && . \"$ROOT/aliases.sh\"
+[ -f \"$ROOT/fzf.bash\" ] && . \"$ROOT/fzf.bash\"
 $MARK_END"
 
 if [ "$DRY" -eq 1 ]; then
