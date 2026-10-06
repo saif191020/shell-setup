@@ -116,7 +116,6 @@ if [ -f "$0" ]; then
 fi
 
 if [ -z "$script_dir" ] || [ ! -f "$script_dir/shell/init.bash" ]; then
-    case "$REPO_URL" in *saif191020*) die "set SHELL_SETUP_REPO to your repo's git URL (or edit REPO_URL in install.sh)" ;; esac
     if ! have git; then
         [ "$UNINSTALL" -eq 1 ] && die "git is required to bootstrap"
         say "git is needed to fetch the repo"
