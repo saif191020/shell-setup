@@ -61,10 +61,10 @@ else
 fi
 
 # Fuzzy completion for cd, vim, kill, ssh, export, ... With plain <Tab> the
-# listings are kept shallow (default depth 3, no symlink following) so
+# listings show only the current level (depth 1, no symlink following) so
 # `cd /<Tab>` can't crawl a whole filesystem. Override with FZF_COMPLETION_MAX_DEPTH.
 if [ -z "$FZF_COMPLETION_TRIGGER" ]; then
-    _fzf_depth="${FZF_COMPLETION_MAX_DEPTH:-3}"
+    _fzf_depth="${FZF_COMPLETION_MAX_DEPTH:-1}"
 else
     _fzf_depth=
 fi
