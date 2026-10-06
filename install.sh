@@ -45,9 +45,10 @@ run() {
     if [ "$DRY" -eq 1 ]; then printf '   [dry-run] %s\n' "$*"; else "$@"; fi
 }
 
+# sudo is usable if it needs no password or we have a terminal to prompt on.
 SUDO=
-if [ "$(id -u)" -ne 0 ]; then
-    if have sudo; then SUDO=sudo; fi
+if [ "$(id -u)" -ne 0 ] && have sudo; then
+    if sudo -n true 2>/dev/null || { : </dev/tty; } 2>/dev/null; then SUDO=sudo; fi
 fi
 
 PM=
@@ -177,7 +178,7 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
     if [ -z "$PM" ]; then
         warn "no supported package manager found; skipping package install"
     elif [ -z "$SUDO" ] && [ "$(id -u)" -ne 0 ] && [ "$PM" != brew ]; then
-        warn "not root and no sudo; skipping package install"
+        warn "need root: no sudo, or sudo has no terminal for a password. Re-run in a terminal to install packages"
     else
         missing=
         for t in git curl fzf bat eza xclip rg fd bash-completion; do
