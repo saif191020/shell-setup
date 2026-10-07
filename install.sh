@@ -87,6 +87,50 @@ tool_present() {
     esac
 }
 
+install_packages() {
+    if [ "$DO_PACKAGES" -eq 1 ]; then
+        if [ -z "$PM" ]; then
+            warn "no supported package manager found; skipping package install"
+        elif [ -z "$SUDO" ] && [ "$(id -u)" -ne 0 ]; then
+            warn "need root: no sudo, or sudo has no terminal for a password. Re-run in a terminal to install packages"
+        else
+            missing=
+            for t in git curl bat eza xclip; do
+                tool_present "$t" || missing="$missing $t"
+            done
+            if [ -z "$missing" ]; then
+                say "All packages already installed"
+            else
+                say "Installing:$missing  (via $PM)"
+                [ "$PM" = apt ] && { run $SUDO apt-get update -qq || warn "apt-get update failed"; }
+                for pkg in $missing; do
+                    if [ "$DRY" -eq 0 ] && ! pm_has_package "$pkg"; then
+                        warn "$pkg is not available from $PM repos; skipping"
+                        continue
+                    fi
+                    pm_install "$pkg" || warn "failed to install $pkg"
+                done
+            fi
+        fi
+    else
+        say "Skipping packages (--no-packages)"
+    fi
+}
+
+# Run as `sudo sh` / `| sudo sh`: install packages as root, then redo everything
+# else as the invoking user, so files land in their home and not in /root.
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] \
+    && [ -z "${SHELL_SETUP_DROPPED:-}" ]; then
+    [ "$UNINSTALL" -eq 0 ] && install_packages
+    say "Continuing as $SUDO_USER"
+    if [ -f "$0" ]; then
+        exec sudo -u "$SUDO_USER" -H env SHELL_SETUP_DROPPED=1 sh "$0" --no-packages "$@"
+    fi
+    raw_url=$(printf '%s' "$REPO_URL" | sed -E 's#^https://github.com/(.*)\.git$#https://raw.githubusercontent.com/\1#')/$REF/install.sh
+    exec sudo -u "$SUDO_USER" -H env SHELL_SETUP_DROPPED=1 \
+        sh -c 'u=$1; shift; curl -fsSL "$u" | sh -s -- "$@"' sh "$raw_url" --no-packages "$@"
+fi
+
 # ---------------------------------------------------------------------------
 # Bootstrap: when piped from curl there is no checkout next to this script, so
 # clone (or update) one and re-run the installer from it.
@@ -157,36 +201,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
     exit 0
 fi
 
-# ---------------------------------------------------------------------------
-# 1. Packages the aliases use
-# ---------------------------------------------------------------------------
-if [ "$DO_PACKAGES" -eq 1 ]; then
-    if [ -z "$PM" ]; then
-        warn "no supported package manager found; skipping package install"
-    elif [ -z "$SUDO" ] && [ "$(id -u)" -ne 0 ]; then
-        warn "need root: no sudo, or sudo has no terminal for a password. Re-run in a terminal to install packages"
-    else
-        missing=
-        for t in curl bat eza xclip; do
-            tool_present "$t" || missing="$missing $t"
-        done
-        if [ -z "$missing" ]; then
-            say "All packages already installed"
-        else
-            say "Installing:$missing  (via $PM)"
-            [ "$PM" = apt ] && { run $SUDO apt-get update -qq || warn "apt-get update failed"; }
-            for pkg in $missing; do
-                if [ "$DRY" -eq 0 ] && ! pm_has_package "$pkg"; then
-                    warn "$pkg is not available from $PM repos; skipping"
-                    continue
-                fi
-                pm_install "$pkg" || warn "failed to install $pkg"
-            done
-        fi
-    fi
-else
-    say "Skipping packages (--no-packages)"
-fi
+install_packages
 
 # eza isn't in every distro's repos (e.g. Debian 12). Fall back to the upstream
 # release binary in ~/.local/bin, unless exa is already there.
@@ -204,7 +219,7 @@ if [ "$DO_BINARIES" -eq 1 ] && ! have eza && ! have exa && [ ! -x "$HOME/.local/
         else
             mkdir -p "$HOME/.local/bin"
             tmp=$(mktemp -d)
-            if curl -fsSL "$url" | tar xz -C "$tmp" && [ -f "$tmp/eza" ]; then
+            if curl -fsSL "$url" | tar xz --no-same-owner -C "$tmp" && [ -f "$tmp/eza" ]; then
                 install -m 0755 "$tmp/eza" "$HOME/.local/bin/eza"
             else
                 warn "could not fetch eza; ls aliases will fall back to plain ls"
@@ -250,6 +265,7 @@ block="$MARK_BEGIN
 # Managed by shell-setup. Edit via the repo, not here.
 [ -f \"$ROOT/aliases.sh\" ] && . \"$ROOT/aliases.sh\"
 [ -f \"$ROOT/fzf.bash\" ] && . \"$ROOT/fzf.bash\"
+[ -f \"$ROOT/vendor/z.sh\" ] && . \"$ROOT/vendor/z.sh\"
 $MARK_END"
 
 if [ "$DRY" -eq 1 ]; then

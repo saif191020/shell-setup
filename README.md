@@ -1,6 +1,6 @@
 # shell-setup
 
-My shell aliases, plus the tools they use (`eza`, `bat`, `xclip`, `curl`), and fzf.
+My shell aliases, plus the tools they use (`eza`, `bat`, `xclip`, `curl`), fzf, and [z](https://github.com/rupa/z).
 Safe to re-run.
 
 ## Install
@@ -21,7 +21,7 @@ Then open a new shell or run `exec bash`. To update, run the installer again.
 
 It installs any missing tools (apt, dnf, pacman or apk, using `sudo` when not root),
 clones fzf into `~/.fzf` and runs its installer without prompts, and adds one block
-to `~/.bashrc` that sources `aliases.sh` and `fzf.bash`. The original is saved
+to `~/.bashrc` that sources `aliases.sh`, `fzf.bash` and `vendor/z.sh`. The original is saved
 as `~/.bashrc.pre-shell-setup`.
 
 | Flag | Effect |
@@ -54,3 +54,11 @@ Icons need a [Nerd Font](https://www.nerdfonts.com/).
 | `Ctrl-T` | pick a file |
 | `Alt-C` | cd into a folder |
 | `**<Tab>` | fuzzy path completion (`vim **<Tab>`) |
+
+## z
+
+`z foo` jumps to the most frequent/recent directory matching `foo`; `z -l foo` lists matches.
+It learns as you `cd` around (data in `~/.z`).
+
+Running with `sudo` works too (`curl … | sudo sh`): packages are installed as root and
+the rest is set up for the user who ran `sudo`, not for root.
