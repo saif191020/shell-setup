@@ -1,5 +1,4 @@
 # shell-setup
-
 My shell aliases, plus the tools they use (`eza`, `bat`, `xclip`, `curl`), fzf, and [z](https://github.com/rupa/z).
 Safe to re-run.
 
