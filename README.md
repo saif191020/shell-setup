@@ -49,7 +49,7 @@ Icons need a [Nerd Font](https://www.nerdfonts.com/).
 
 | Key | Does |
 |---|---|
-| `cd <Tab>` | pick a folder in the current directory; one match completes straight away |
+| `cd <Tab>` | pick a folder; selecting one appends `/` so you can Tab again into subfolders; a single match completes straight away |
 | `Ctrl-R` | search history |
 | `Ctrl-T` | pick a file |
 | `Alt-C` | cd into a folder |
